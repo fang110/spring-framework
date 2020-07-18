@@ -31,6 +31,7 @@ import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
 /**
+ * testFangyilin
  * Convenient base class for bean configurers that can perform Dependency Injection
  * on objects (however they may be created). Typically subclassed by AspectJ aspects.
  *
