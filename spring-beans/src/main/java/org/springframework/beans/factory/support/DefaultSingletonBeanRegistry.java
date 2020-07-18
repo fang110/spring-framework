@@ -63,6 +63,8 @@ import org.springframework.util.StringUtils;
  *
  * @author Juergen Hoeller
  * @since 2.0
+ *
+ * 
  * @see #registerSingleton
  * @see #registerDisposableBean
  * @see org.springframework.beans.factory.DisposableBean
