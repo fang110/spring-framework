@@ -1779,6 +1779,8 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			Object beanInstance, String name, String beanName, @Nullable RootBeanDefinition mbd) {
 
 		// Don't let calling code try to dereference the factory if the bean isn't a factory.
+		//整个判断的意思是:如果要获取的bean是FactoryBean的引用，但是beanInstance不是FactoryBean的，则抛出异常
+		//判断输入的bean的name是否是工厂相关的(前缀是&)
 		if (BeanFactoryUtils.isFactoryDereference(name)) {
 			if (beanInstance instanceof NullBean) {
 				return beanInstance;
