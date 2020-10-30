@@ -42,6 +42,7 @@ public interface PropertyEditorRegistrar {
 	 * method (since {@code PropertyEditors} are not threadsafe).
 	 * @param registry the {@code PropertyEditorRegistry} to register the
 	 * custom {@code PropertyEditors} with
+	 * 通过注册Spring自带的属性编辑器CustomDateEditor
 	 */
 	void registerCustomEditors(PropertyEditorRegistry registry);
 
