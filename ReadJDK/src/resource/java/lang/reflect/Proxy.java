@@ -698,6 +698,10 @@ public class Proxy implements java.io.Serializable {
 	 *          argument or any of its elements are {@code null}, or
 	 *          if the invocation handler, {@code h}, is
 	 *          {@code null}
+	 *          返回某个对象的代理对象
+*               ClassLoader loader:Java类加载器; 可以通过这个类型的加载器，在程序运行时，将生成的代理类加载到JVM即Java虚拟机中，以便运行时需要！
+	 *          Class<?>[] interfaces:被代理类的所有接口信息; 便于生成的代理类可以具有代理类接口中的所有方法
+	 *          InvocationHandler h:调用处理器; 调用实现了InvocationHandler 类的一个回调方法
 	 */
 	@CallerSensitive
 	public static Object newProxyInstance(ClassLoader loader,
@@ -705,9 +709,11 @@ public class Proxy implements java.io.Serializable {
 										  InvocationHandler h)
 			throws IllegalArgumentException
 	{
+		//null检查，h为null就抛出NullPointException
 		Objects.requireNonNull(h);
-
+		//将接口类对象数组clone一份
 		final Class<?>[] intfs = interfaces.clone();
+		//执行权限检查
 		final SecurityManager sm = System.getSecurityManager();
 		if (sm != null) {
 			checkProxyAccess(Reflection.getCallerClass(), loader, intfs);
@@ -715,6 +721,7 @@ public class Proxy implements java.io.Serializable {
 
 		/*
 		 * Look up or generate the designated proxy class.
+		 * 查找或者是生成一个特定的代理类对象
 		 */
 		Class<?> cl = getProxyClass0(loader, intfs);
 
@@ -725,9 +732,10 @@ public class Proxy implements java.io.Serializable {
 			if (sm != null) {
 				checkNewProxyPermission(Reflection.getCallerClass(), cl);
 			}
-
+			//从代理类对象中查找参数为InvocationHandler的构造器
 			final Constructor<?> cons = cl.getConstructor(constructorParams);
 			final InvocationHandler ih = h;
+			// 检测构造器是否是Public修饰，如果不是则强行转换为可以访问的。
 			if (!Modifier.isPublic(cl.getModifiers())) {
 				AccessController.doPrivileged(new PrivilegedAction<Void>() {
 					public Void run() {
@@ -736,6 +744,7 @@ public class Proxy implements java.io.Serializable {
 					}
 				});
 			}
+			// 通过反射，将h作为参数，实例化代理类，返回代理类实例。
 			return cons.newInstance(new Object[]{h});
 		} catch (IllegalAccessException|InstantiationException e) {
 			throw new InternalError(e.toString(), e);
@@ -804,6 +813,7 @@ public class Proxy implements java.io.Serializable {
 	 *          and invocation of {@link SecurityManager#checkPackageAccess
 	 *          s.checkPackageAccess()} denies access to the invocation
 	 *          handler's class.
+	 *          该方法用于获取指定代理对象所关联的InvocationHandler
 	 */
 	@CallerSensitive
 	public static InvocationHandler getInvocationHandler(Object proxy)
