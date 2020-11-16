@@ -550,22 +550,27 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 		// Instantiate the bean.
 		BeanWrapper instanceWrapper = null;
+		//如果定义的是单例模式，就先从缓存中清除
 		if (mbd.isSingleton()) {
 			instanceWrapper = this.factoryBeanInstanceCache.remove(beanName);
 		}
+		//如果 instanceWrapper为空，那就创建对应的beanInstance,具体方法在下面小节分析
 		if (instanceWrapper == null) {
 			instanceWrapper = createBeanInstance(beanName, mbd, args);
 		}
 		final Object bean = instanceWrapper.getWrappedInstance();
 		Class<?> beanType = instanceWrapper.getWrappedClass();
 		if (beanType != NullBean.class) {
+			// 将 解析类型 设置 为 beanType
 			mbd.resolvedTargetType = beanType;
 		}
 
-		// Allow post-processors to modify the merged bean definition.
+		// Allow post-processors to modify the merged bean definition.使用后置处理器对其进行处理
 		synchronized (mbd.postProcessingLock) {
 			if (!mbd.postProcessed) {
 				try {
+					// 这里主要是 MergedBeanDefinitionPostProcessor
+					//对@Autowire,@Value等这些注解进行处理, 相关的可以参考AutowiredAnnotationBeanPostProcessor相关逻辑
 					applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
 				}
 				catch (Throwable ex) {
@@ -578,6 +583,14 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 		// Eagerly cache singletons to be able to resolve circular references
 		// even when triggered by lifecycle interfaces like BeanFactoryAware.
+		/* 是否需要提前曝光 单例 & 允许循环依赖 & 当前bean正在创建中，检查循环依赖
+		 * 这里主要是调用方法addSingletonFactory，往缓存singletonFactories里面放入一个ObjectFactory
+		 * 当其他的bean对该bean有依赖时，可以提前获取到getEarlyBeanReference方法就是获取一个引用，里面主要是
+		 * 调用了SmartInstantiationAwareBeanPostsProcessor的getEarlyBeanReference方法，以便解决循环依赖问题，这里
+		 * 一般都是bean本身，在AOP代理时是代理
+		 *
+		 *
+		 * **/
 		boolean earlySingletonExposure = (mbd.isSingleton() && this.allowCircularReferences &&
 				isSingletonCurrentlyInCreation(beanName));
 		if (earlySingletonExposure) {
@@ -585,12 +598,18 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 				logger.trace("Eagerly caching bean '" + beanName +
 						"' to allow for resolving potential circular references");
 			}
+			/**
+			 *  为避免后期循环依赖，可以在bean初始化完成前将创建实例的objectFactory加入缓存
+			 *  对bean再一次依赖引用，主要应用SmartInstantiationAwareBeanPostProcessor
+			 *  其中我们熟悉的AOP就是在这里将advice动态织入，若没有直接返回bean
+			 */
 			addSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, mbd, bean));
 		}
 
-		// Initialize the bean instance.
+		// Initialize the bean instance.下面就是初始化实例了
 		Object exposedObject = bean;
 		try {
+			//对bean进行填充，将各个属性值注入，其中可能存在依赖于其他bean的属性，会递归初始化
 			populateBean(beanName, mbd, instanceWrapper);
 			exposedObject = initializeBean(beanName, exposedObject, mbd);
 		}
@@ -606,18 +625,25 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 		if (earlySingletonExposure) {
 			Object earlySingletonReference = getSingleton(beanName, false);
+			//earlySingletonReference只有在检测到有循环依赖的情况下才不会为空
 			if (earlySingletonReference != null) {
+				//如果exposedObject没有在初始化方法中被改变，也就是没有被增强
 				if (exposedObject == bean) {
 					exposedObject = earlySingletonReference;
 				}
 				else if (!this.allowRawInjectionDespiteWrapping && hasDependentBean(beanName)) {
 					String[] dependentBeans = getDependentBeans(beanName);
 					Set<String> actualDependentBeans = new LinkedHashSet<>(dependentBeans.length);
+					//检查依赖
 					for (String dependentBean : dependentBeans) {
 						if (!removeSingletonIfCreatedForTypeCheckOnly(dependentBean)) {
 							actualDependentBeans.add(dependentBean);
 						}
 					}
+					/**
+					 * 因为bean创建后其所依赖的bean一定是已经创建，
+					 * actualDependentBeans不为空则表示当前bean创建后其依赖的bean却没有全部创建，也就是说存在依赖
+					 */
 					if (!actualDependentBeans.isEmpty()) {
 						throw new BeanCurrentlyInCreationException(beanName,
 								"Bean with name '" + beanName + "' has been injected into other beans [" +
@@ -632,6 +658,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		}
 
 		// Register bean as disposable.
+		//注册到disposableBeans里面，以便在销毁bean的时候可以运行指定的相关业务
 		try {
 			registerDisposableBeanIfNecessary(beanName, bean, mbd);
 		}
